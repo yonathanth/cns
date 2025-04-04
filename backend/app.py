@@ -5,6 +5,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from flask_cors import CORS 
 import base64
+import os  
 from dotenv import load_dotenv
 
 load_dotenv()
