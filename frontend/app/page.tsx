@@ -11,13 +11,16 @@ export default function EncryptionPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Update key placeholder based on algorithm
+  // Update key placeholder and validation based on algorithm and mode
   useEffect(() => {
     if (algorithm === "otp" && mode === "Encrypt") {
       // Auto-adjust key length for OTP encryption
       setKey((prev) =>
         prev.slice(0, message.length).padEnd(message.length, "0")
       );
+    } else if (algorithm === "rsa") {
+      // Clear key field for RSA as it's not needed
+      setKey("");
     }
   }, [message, algorithm, mode]);
 
@@ -32,13 +35,13 @@ export default function EncryptionPage() {
       return;
     }
 
-    if (!key) {
+    // Algorithm-specific validation
+    if (algorithm !== "rsa" && !key) {
       setError("Key cannot be empty");
       setIsLoading(false);
       return;
     }
 
-    // OTP-specific validation
     if (
       algorithm === "otp" &&
       mode === "Encrypt" &&
@@ -58,7 +61,7 @@ export default function EncryptionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: message,
-          key: key,
+          key: algorithm === "rsa" ? "" : key, // Don't send key for RSA
           algorithm: algorithm,
         }),
       });
@@ -66,9 +69,11 @@ export default function EncryptionPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Operation failed");
 
-      setResult(data.encrypted_message || data.decrypted_message);
+      setResult(
+        mode === "Encrypt" ? data.encrypted_message : data.decrypted_message
+      );
       setError("");
-    } catch (error) {
+    } catch (error: any) {
       setError(error.message);
       setResult("");
     } finally {
@@ -95,37 +100,63 @@ export default function EncryptionPage() {
             {error}
           </div>
         )}
+
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-black">
+            {mode} with {algorithm.toUpperCase()}
+          </h2>
+          <select
+            className="p-2 bg-white text-black rounded-md"
+            value={algorithm}
+            onChange={(e) => setAlgorithm(e.target.value)}
+          >
+            <option value="otp">OTP</option>
+            <option value="aes">AES</option>
+            <option value="3des">3DES</option>
+            <option value="rsa">RSA</option>
+          </select>
+        </div>
+
         <textarea
           className="w-full p-2 bg-white text-black mb-4 rounded-md"
-          placeholder="message to encrypt"
+          placeholder={
+            mode === "Encrypt"
+              ? "Message to encrypt"
+              : algorithm === "rsa"
+              ? "Comma-separated RSA chunks to decrypt"
+              : "Message to decrypt"
+          }
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={4}
         />
-        <input
-          type="text"
-          className="w-full bg-white text-black p-2 mb-4 rounded-md"
-          placeholder={
-            algorithm === "otp"
-              ? mode === "Encrypt"
-                ? `OTP key (${message.length} chars)`
-                : "Enter OTP key"
-              : mode === "Encrypt"
-              ? "Encryption key"
-              : "Decryption key"
-          }
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-        />
-        <select
-          className="w-1/5 p-1 mb-12 bg-white text-black rounded-md"
-          value={algorithm}
-          onChange={(e) => setAlgorithm(e.target.value)}
-        >
-          <option value="otp">OTP</option>
-          <option value="aes">AES</option>
-          <option value="3des">3DES</option>
-        </select>
+
+        {algorithm !== "rsa" && (
+          <input
+            type="text"
+            className="w-full bg-white text-black p-2 mb-4 rounded-md"
+            placeholder={
+              algorithm === "otp"
+                ? mode === "Encrypt"
+                  ? `OTP key (${message.length} chars)`
+                  : "Enter OTP key"
+                : mode === "Encrypt"
+                ? "Encryption key"
+                : "Decryption key"
+            }
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          />
+        )}
+
+        {algorithm === "rsa" && (
+          <div className="text-sm text-gray-600 mb-4">
+            {mode === "Encrypt"
+              ? "Using RSA public key from server"
+              : "Using RSA private key from server"}
+          </div>
+        )}
+
         <div className="flex justify-center">
           <button
             className={`w-1/2 p-2 bg-black text-white rounded-md ${
@@ -137,12 +168,25 @@ export default function EncryptionPage() {
             {isLoading ? "Processing..." : mode}
           </button>
         </div>
-        <div className="mt-4 p-2 min-h-14 text-black bg-white rounded-md break-words">
-          {result ||
-            (mode === "Encrypt"
-              ? "Encrypted result will appear here"
-              : "Decrypted result will appear here")}
+
+        <div className="mt-4 p-4 min-h-20 text-black bg-white rounded-md break-words">
+          <h3 className="font-semibold mb-2">
+            {mode === "Encrypt" ? "Result:" : "Decrypted Message:"}
+          </h3>
+          {result || (
+            <span className="text-gray-500">
+              {mode === "Encrypt"
+                ? "Encrypted result will appear here"
+                : "Decrypted result will appear here"}
+            </span>
+          )}
         </div>
+
+        {algorithm === "rsa" && mode === "Encrypt" && result && (
+          <div className="text-xs text-gray-600 mt-2">
+            Note: RSA encryption produces comma-separated chunks
+          </div>
+        )}
       </div>
     </div>
   );
